@@ -141,8 +141,8 @@ fn classicalize_string_field(field: &Field) -> proc_macro2::TokenStream {
     let get = Ident::new(&format!("get_{}", ident_str), Span::call_site());
     let take = Ident::new(&format!("take_{}", ident_str), Span::call_site());
     quote! {
-        pub fn #set(&mut self, value: impl Into<String>) {
-            self.#ident = value.into();
+        pub fn #set(&mut self, value: String) {
+            self.#ident = value;
         }
 
         pub fn #get(&self) -> &str {
@@ -165,8 +165,8 @@ fn classicalize_bytes_field(field: &Field) -> proc_macro2::TokenStream {
     let get = Ident::new(&format!("get_{}", ident_str), Span::call_site());
     let take = Ident::new(&format!("take_{}", ident_str), Span::call_site());
     quote! {
-        pub fn #set(&mut self, value: impl Into<Vec<u8>>) {
-            self.#ident = value.into();
+        pub fn #set(&mut self, value: Vec<u8>) {
+            self.#ident = value;
         }
 
         pub fn #get(&self) -> &[u8] {

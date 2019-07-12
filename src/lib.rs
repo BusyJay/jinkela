@@ -3,7 +3,7 @@
 extern crate quick_error;
 
 /// Unifies different interfaces of message in different protocol implementations.
-pub trait GenericMessage {
+pub trait GenericMessage: Sized {
     type Error;
 
     /// Get the size of encoded messages.
@@ -11,7 +11,7 @@ pub trait GenericMessage {
     /// Encode the message into buf.
     fn encode_into(&self, buf: &mut Vec<u8>) -> Result<(), Self::Error>;
     /// Decode a message from the data.
-    fn decode_from(&mut self, data: &[u8]) -> Result<(), Self::Error>;
+    fn decode_from(data: &[u8]) -> Result<Self, Self::Error>;
 }
 
 pub trait GenericEnum: Sized {
@@ -22,7 +22,7 @@ pub trait GenericEnum: Sized {
 mod codec {
     pub use protobuf::ProtobufError;
 
-    impl<T: protobuf::Message> super::GenericMessage for T {
+    impl<T: protobuf::Message + Default> super::GenericMessage for T {
         type Error = ProtobufError;
 
         #[inline]
@@ -36,8 +36,10 @@ mod codec {
         }
 
         #[inline]
-        fn decode_from(&mut self, data: &[u8]) -> Result<(), ProtobufError> {
-            protobuf::Message::merge_from_bytes(self, data)
+        fn decode_from(data: &[u8]) -> Result<T, ProtobufError> {
+            let mut m = T::default();
+            m.merge_from_bytes(data)?;
+            Ok(m)
         }
     }
 
@@ -74,7 +76,7 @@ mod codec {
         }
     }
 
-    impl<T: prost::Message> super::GenericMessage for T {
+    impl<T: prost::Message + Default> super::GenericMessage for T {
         type Error = ProtobufError;
 
         #[inline]
@@ -88,8 +90,8 @@ mod codec {
         }
 
         #[inline]
-        fn decode_from(&mut self, data: &[u8]) -> Result<(), ProtobufError> {
-            prost::Message::merge(self, data).map_err(ProtobufError::Decode)
+        fn decode_from(data: &[u8]) -> Result<T, ProtobufError> {
+            T::decode(data).map_err(ProtobufError::Decode)
         }
     }
 }

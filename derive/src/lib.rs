@@ -7,7 +7,7 @@ use proc_macro::TokenStream;
 use proc_macro2::Span;
 use syn::{
     Data, DataEnum, DataStruct, DeriveInput, Fields, FieldsNamed, PathArguments, GenericArgument,
-    FieldsUnnamed, Ident, Meta, Field, MetaList, NestedMeta, Type,
+    FieldsUnnamed, Ident, Meta, Field, MetaList, NestedMeta, Type, Lit, Path,
 };
 
 #[proc_macro_derive(Classicalize, attributes(prost))]
@@ -21,24 +21,7 @@ pub fn classicalize(input: TokenStream) -> TokenStream {
     s.into()
 }
 
-fn classicalize_accessors(field: &Field) -> Option<proc_macro2::TokenStream> {
-    let is_message = field.attrs.iter().any(|a| {
-        a.interpret_meta().iter().any(|m| {
-            match m {
-                Meta::List(MetaList { ident, nested, .. }) => {
-                    ident == "prost" && 
-                        nested.iter().any(|a| match a {
-                            NestedMeta::Meta(Meta::Word(ty)) => ty == "message",
-                            _ => false
-                        })
-                }
-                _ => false,
-            }
-        })
-    });
-    if !is_message {
-        return None;
-    }
+fn classicalize_message_field(field: &Field) -> proc_macro2::TokenStream {
     let ident = field.ident.as_ref().unwrap();
     let mut ident_str = ident.to_string();
     if ident_str.starts_with("r#") {
@@ -63,7 +46,7 @@ fn classicalize_accessors(field: &Field) -> Option<proc_macro2::TokenStream> {
     let set = Ident::new(&format!("set_{}", ident_str), Span::call_site());
     let get = Ident::new(&format!("get_{}", ident_str), Span::call_site());
     let mutation = Ident::new(&format!("mut_{}", ident_str), Span::call_site());
-    Some(quote! {
+    quote! {
         pub fn #set(&mut self, value: #ty) {
             self.#ident = Some(value);
         }
@@ -75,7 +58,55 @@ fn classicalize_accessors(field: &Field) -> Option<proc_macro2::TokenStream> {
         pub fn #mutation(&mut self) -> &mut #ty {
             self.#ident.get_or_insert_with(|| #ty::default())
         }
-    })
+    }
+}
+
+fn classicalize_enum_field(field: &Field, lit: &Lit) -> proc_macro2::TokenStream {
+    let ident = field.ident.as_ref().unwrap();
+    let get = Ident::new(&format!("get_{}", ident), Span::call_site());
+    let set = Ident::new(&format!("set_{}", ident), Span::call_site());
+    let ty = match lit {
+        Lit::Str(s) => syn::parse_str::<Path>(&s.value()).unwrap(),
+        _ => panic!("expected enum type, but got {:?}", lit),
+    };
+    quote! {
+        pub fn #get(&self) -> #ty {
+            match #ty::from_i32(self.#ident) {
+                Some(v) => v,
+                None => panic!("Unexpected enum value for #lit: {}", self.#ident),
+            }
+        }
+
+        pub fn #set(&mut self, value: #ty) {
+            self.#ident = value as i32;
+        }
+    }
+}
+
+fn classicalize_accessors(field: &Field) -> Option<proc_macro2::TokenStream> {
+    for a in &field.attrs {
+        for m in a.interpret_meta() {
+            match m {
+                Meta::List(MetaList { ident, nested, .. }) => {
+                    if ident == "prost" {
+                        for n in nested {
+                            match n {
+                                NestedMeta::Meta(Meta::Word(ty)) => if ty == "message" {
+                                    return Some(classicalize_message_field(field));
+                                }
+                                NestedMeta::Meta(Meta::NameValue(nv)) => if nv.ident == "enumeration" {
+                                    return Some(classicalize_enum_field(field, &nv.lit))
+                                }
+                                _ => ()
+                            }
+                        }
+                    }
+                },
+                _ => (),
+            }
+        }
+    }
+    None
 }
 
 fn classicalize_struct(ident: Ident, s: DataStruct) -> proc_macro2::TokenStream {

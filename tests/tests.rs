@@ -11,6 +11,8 @@ mod prost_tests {
         b1: Option<B>,
         #[prost(message)]
         b2: ::std::option::Option<B>,
+        #[prost(enumeration = "E")]
+        e: i32,
     }
 
     #[derive(::jinkela::Classicalize, Default, Debug, PartialEq)]
@@ -23,6 +25,22 @@ mod prost_tests {
     enum E {
         T = 0,
         C = 1,
+    }
+
+    impl Default for E {
+        fn default() -> E {
+            E::T
+        }
+    }
+
+    impl E {
+        pub fn from_i32(i: i32) -> Option<E> {
+            match i {
+                0 => Some(E::T),
+                1 => Some(E::C),
+                _ => None
+            }
+        }
     }
 
     #[test]
@@ -38,6 +56,9 @@ mod prost_tests {
         assert_eq!(*B::default_instance(), b);
         a.set_b2(b);
         assert_eq!(a.get_b2().b, 0);
+        assert_eq!(a.get_e(), E::T);
+        a.set_e(E::C);
+        assert_eq!(a.get_e(), E::C);
     }
 
     #[test]

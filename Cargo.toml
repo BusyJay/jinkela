@@ -15,7 +15,7 @@ categories = ["encoding"]
 members = ["derive"]
 
 [features]
-default = ["repr-protobuf"]
+default = []
 repr-protobuf = ["protobuf", "protobuf-codegen-pure"]
 repr-prost = ["prost", "prost-build", "bytes", "quick-error", "jinkela-derive"]
 

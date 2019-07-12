@@ -1,3 +1,4 @@
+#[cfg(feature = "repr-prost")]
 #[macro_use]
 extern crate quick_error;
 
@@ -94,3 +95,5 @@ mod codec {
 }
 
 pub use codec::ProtobufError;
+#[cfg(feature = "repr-prost")]
+pub use jinkela_derive::*;

@@ -63,6 +63,12 @@ mod prost_tests {
         assert_eq!(a.get_e(), E::T);
         a.e = E::C as i32;
         assert_eq!(a.get_e(), E::C);
+        assert_eq!(a.get_b3(), &[]);
+        a.mut_b3().push(B::default());
+        assert_eq!(a.take_b3(), vec![B::default()]);
+        assert_eq!(a.get_b3(), &[]);
+        a.set_b3(vec![B::default(), B::default()]);
+        assert_eq!(a.get_b3().len(), 2);
     }
 
     #[test]

@@ -21,7 +21,7 @@ pub fn classicalize(input: TokenStream) -> TokenStream {
     s.into()
 }
 
-fn classicalize_message_field(field: &Field) -> proc_macro2::TokenStream {
+fn classicalize_optional_message_field(field: &Field) -> proc_macro2::TokenStream {
     let ident = field.ident.as_ref().unwrap();
     let mut ident_str = ident.to_string();
     if ident_str.starts_with("r#") {
@@ -66,6 +66,51 @@ fn classicalize_message_field(field: &Field) -> proc_macro2::TokenStream {
     }
 }
 
+fn classicalize_repeated_message_field(field: &Field) -> proc_macro2::TokenStream {
+    let ident = field.ident.as_ref().unwrap();
+    let mut ident_str = ident.to_string();
+    if ident_str.starts_with("r#") {
+        ident_str = ident_str[2..].to_owned();
+    }
+    let origin_ty = &field.ty;
+    let ty = match origin_ty {
+        Type::Path(tp) => {
+            let wrapper = tp.path.segments.iter().last().unwrap();
+            assert_eq!(wrapper.ident, "Vec", "expected Vec, but got {:?}", origin_ty);
+            let generic_arg = match wrapper.arguments {
+                PathArguments::AngleBracketed(ref params) => params.args.iter().next().unwrap(),
+                _ => panic!("unexpected token {:?}", origin_ty),
+            };
+            match generic_arg {
+                GenericArgument::Type(ty) => ty,
+                _ => panic!("expected generic, but get {:?}", origin_ty),
+            }
+        },
+        _ => panic!("unexpected type {:?}", origin_ty),
+    };
+    let set = Ident::new(&format!("set_{}", ident_str), Span::call_site());
+    let get = Ident::new(&format!("get_{}", ident_str), Span::call_site());
+    let take = Ident::new(&format!("take_{}", ident_str), Span::call_site());
+    let mutation = Ident::new(&format!("mut_{}", ident_str), Span::call_site());
+    quote! {
+        pub fn #set(&mut self, value: #origin_ty) {
+            self.#ident = value;
+        }
+
+        pub fn #get(&self) -> &[#ty] {
+            &self.#ident
+        }
+
+        pub fn #mutation(&mut self) -> &mut #origin_ty {
+            &mut self.#ident
+        }
+
+        pub fn #take(&mut self) -> #origin_ty {
+            ::std::mem::replace(&mut self.#ident, ::std::vec::Vec::new())
+        }
+    }
+}
+
 fn classicalize_enum_field(field: &Field, lit: &Lit) -> proc_macro2::TokenStream {
     let ident = field.ident.as_ref().unwrap();
     let get = Ident::new(&format!("get_{}", ident), Span::call_site());
@@ -89,14 +134,17 @@ fn classicalize_accessors(field: &Field) -> Option<proc_macro2::TokenStream> {
             match m {
                 Meta::List(MetaList { ident, nested, .. }) => {
                     if ident == "prost" {
-                        let mut is_message = false;
-                        let mut is_optional = false;
+                        let mut message = false;
+                        let mut optional = false;
+                        let mut repeated = false;
                         for n in nested {
                             match n {
                                 NestedMeta::Meta(Meta::Word(w)) => if w == "message" {
-                                    is_message = true;
+                                    message = true;
                                 } else if w == "optional" {
-                                    is_optional = true;
+                                    optional = true;
+                                } else if w == "repeated" {
+                                    repeated = true;
                                 }
                                 NestedMeta::Meta(Meta::NameValue(nv)) => if nv.ident == "enumeration" {
                                     return Some(classicalize_enum_field(field, &nv.lit))
@@ -104,8 +152,12 @@ fn classicalize_accessors(field: &Field) -> Option<proc_macro2::TokenStream> {
                                 _ => ()
                             }
                         }
-                        if is_message && is_optional {
-                            return Some(classicalize_message_field(field));
+                        if message {
+                            if optional {
+                                return Some(classicalize_optional_message_field(field));
+                            } else if repeated {
+                                return Some(classicalize_repeated_message_field(field));
+                            }
                         }
                     }
                 },

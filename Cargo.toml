@@ -12,7 +12,7 @@ description = "A abstraction to make peace between multiple protobuf implementat
 categories = ["encoding"]
 
 [workspace]
-members = ["derive"]
+members = ["derive", "build"]
 
 [features]
 default = []

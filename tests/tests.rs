@@ -7,10 +7,12 @@ mod prost_tests {
 
     #[derive(::jinkela::Classicalize, Default, Debug)]
     struct A {
-        #[prost(message)]
+        #[prost(message, optional)]
         b1: Option<B>,
-        #[prost(message)]
+        #[prost(message, optional)]
         b2: ::std::option::Option<B>,
+        #[prost(message, repeated)]
+        b3: Vec<B>,
         #[prost(enumeration = "E")]
         e: i32,
     }

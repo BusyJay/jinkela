@@ -89,16 +89,23 @@ fn classicalize_accessors(field: &Field) -> Option<proc_macro2::TokenStream> {
             match m {
                 Meta::List(MetaList { ident, nested, .. }) => {
                     if ident == "prost" {
+                        let mut is_message = false;
+                        let mut is_optional = false;
                         for n in nested {
                             match n {
-                                NestedMeta::Meta(Meta::Word(ty)) => if ty == "message" {
-                                    return Some(classicalize_message_field(field));
+                                NestedMeta::Meta(Meta::Word(w)) => if w == "message" {
+                                    is_message = true;
+                                } else if w == "optional" {
+                                    is_optional = true;
                                 }
                                 NestedMeta::Meta(Meta::NameValue(nv)) => if nv.ident == "enumeration" {
                                     return Some(classicalize_enum_field(field, &nv.lit))
                                 }
                                 _ => ()
                             }
+                        }
+                        if is_message && is_optional {
+                            return Some(classicalize_message_field(field));
                         }
                     }
                 },

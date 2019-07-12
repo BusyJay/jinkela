@@ -7,7 +7,7 @@ use proc_macro::TokenStream;
 use proc_macro2::Span;
 use syn::{
     Data, DataEnum, DataStruct, DeriveInput, Fields, FieldsNamed, PathArguments, GenericArgument,
-    FieldsUnnamed, Ident, Variant, Meta, Field, MetaList, NestedMeta, Type,
+    FieldsUnnamed, Ident, Meta, Field, MetaList, NestedMeta, Type,
 };
 
 #[proc_macro_derive(Classicalize, attributes(prost))]
@@ -47,17 +47,18 @@ fn classicalize_accessors(field: &Field) -> Option<proc_macro2::TokenStream> {
     let ty = &field.ty;
     let ty = match ty {
         Type::Path(tp) => {
-            let wrapper = &tp.path.segments.iter().next().unwrap().arguments;
-            let generic_arg = match wrapper {
-                PathArguments::AngleBracketed(params) => params.args.iter().next().unwrap(),
-                e => panic!("unexpected token {:?}", e),
+            let wrapper = tp.path.segments.iter().last().unwrap();
+            assert_eq!(wrapper.ident, "Option", "expected option, but got {:?}", ty);
+            let generic_arg = match wrapper.arguments {
+                PathArguments::AngleBracketed(ref params) => params.args.iter().next().unwrap(),
+                _ => panic!("unexpected token {:?}", ty),
             };
             match generic_arg {
                 GenericArgument::Type(ty) => ty,
-                e => panic!("expected generic, but get {:?}", e),
+                _ => panic!("expected generic, but get {:?}", ty),
             }
         },
-        t => panic!("unexpected type {:?}", t),
+        _ => panic!("unexpected type {:?}", ty),
     };
     let set = Ident::new(&format!("set_{}", ident_str), Span::call_site());
     let get = Ident::new(&format!("get_{}", ident_str), Span::call_site());
@@ -140,16 +141,9 @@ fn classicalize_enum(ident: Ident, s: DataEnum) -> proc_macro2::TokenStream {
 
     // Map the variants into 'fields'.
     let mut variants = Vec::with_capacity(s.variants.len());
-    for Variant {
-        ident,
-        discriminant,
-        ..
-    } in s.variants
-    {
-        match discriminant {
-            Some((_, expr)) => variants.push(quote! { #ident::#expr }),
-            None => panic!("Enumeration variants must have a disriminant"),
-        }
+    for v in s.variants {
+        let value_ident = &v.ident;
+        variants.push(quote! { #ident::#value_ident});
     }
     quote! {
         #[allow(non_snake_case, unused_attributes)]
@@ -161,6 +155,6 @@ fn classicalize_enum(ident: Ident, s: DataEnum) -> proc_macro2::TokenStream {
                     &[#(#variants,)*]
                 }
             }
-        }
+        };
     }
 }

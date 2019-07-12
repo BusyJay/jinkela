@@ -45,6 +45,7 @@ fn classicalize_message_field(field: &Field) -> proc_macro2::TokenStream {
     };
     let set = Ident::new(&format!("set_{}", ident_str), Span::call_site());
     let get = Ident::new(&format!("get_{}", ident_str), Span::call_site());
+    let take = Ident::new(&format!("take_{}", ident_str), Span::call_site());
     let mutation = Ident::new(&format!("mut_{}", ident_str), Span::call_site());
     quote! {
         pub fn #set(&mut self, value: #ty) {
@@ -57,6 +58,10 @@ fn classicalize_message_field(field: &Field) -> proc_macro2::TokenStream {
 
         pub fn #mutation(&mut self) -> &mut #ty {
             self.#ident.get_or_insert_with(|| #ty::default())
+        }
+
+        pub fn #take(&mut self) -> #ty {
+            self.#ident.take().unwrap_or_else(|| #ty::default())
         }
     }
 }

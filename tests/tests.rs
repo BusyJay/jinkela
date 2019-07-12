@@ -55,6 +55,7 @@ mod prost_tests {
         a.mut_b2().b = 1;
         assert_eq!(a.get_b1().b, 2);
         assert_eq!(a.get_b2().b, 1);
+        assert_eq!(a.take_b2().b, 1);
         let b = B::default();
         assert_eq!(*B::default_instance(), b);
         a.set_b2(b);

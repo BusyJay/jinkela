@@ -47,6 +47,7 @@ fn classicalize_optional_message_field(field: &Field) -> proc_macro2::TokenStrea
     let get = Ident::new(&format!("get_{}", ident_str), Span::call_site());
     let take = Ident::new(&format!("take_{}", ident_str), Span::call_site());
     let mutation = Ident::new(&format!("mut_{}", ident_str), Span::call_site());
+    let has = Ident::new(&format!("has_{}", ident_str), Span::call_site());
     quote! {
         pub fn #set(&mut self, value: #ty) {
             self.#ident = Some(value);
@@ -62,6 +63,10 @@ fn classicalize_optional_message_field(field: &Field) -> proc_macro2::TokenStrea
 
         pub fn #take(&mut self) -> #ty {
             self.#ident.take().unwrap_or_else(|| #ty::default())
+        }
+
+        pub fn #has(&self) -> bool {
+            self.#ident.is_some()
         }
     }
 }

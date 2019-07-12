@@ -55,10 +55,14 @@ mod prost_tests {
     #[test]
     fn test_methods() {
         let mut a = A::default();
+        assert!(!a.has_b1());
+        assert!(!a.has_b2());
         assert_eq!(a.get_b1().b, 0);
         assert_eq!(a.get_b2().b, 0);
         a.mut_b1().b = 2;
         a.mut_b2().b = 1;
+        assert!(a.has_b1());
+        assert!(a.has_b2());
         assert_eq!(a.get_b1().b, 2);
         assert_eq!(a.get_b2().b, 1);
         assert_eq!(a.take_b2().b, 1);

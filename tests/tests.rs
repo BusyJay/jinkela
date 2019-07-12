@@ -24,6 +24,7 @@ mod prost_tests {
     }
 
     #[derive(::jinkela::Classicalize, Debug, PartialEq)]
+    #[repr(i32)]
     enum E {
         T = 0,
         C = 1,
@@ -59,7 +60,7 @@ mod prost_tests {
         a.set_b2(b);
         assert_eq!(a.get_b2().b, 0);
         assert_eq!(a.get_e(), E::T);
-        a.set_e(E::C);
+        a.e = E::C as i32;
         assert_eq!(a.get_e(), E::C);
     }
 

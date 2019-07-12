@@ -64,7 +64,6 @@ fn classicalize_message_field(field: &Field) -> proc_macro2::TokenStream {
 fn classicalize_enum_field(field: &Field, lit: &Lit) -> proc_macro2::TokenStream {
     let ident = field.ident.as_ref().unwrap();
     let get = Ident::new(&format!("get_{}", ident), Span::call_site());
-    let set = Ident::new(&format!("set_{}", ident), Span::call_site());
     let ty = match lit {
         Lit::Str(s) => syn::parse_str::<Path>(&s.value()).unwrap(),
         _ => panic!("expected enum type, but got {:?}", lit),
@@ -75,10 +74,6 @@ fn classicalize_enum_field(field: &Field, lit: &Lit) -> proc_macro2::TokenStream
                 Some(v) => v,
                 None => panic!("Unexpected enum value for #lit: {}", self.#ident),
             }
-        }
-
-        pub fn #set(&mut self, value: #ty) {
-            self.#ident = value as i32;
         }
     }
 }

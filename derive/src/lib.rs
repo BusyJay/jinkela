@@ -66,7 +66,7 @@ fn classicalize_optional_message_field(field: &Field) -> proc_macro2::TokenStrea
     }
 }
 
-fn classicalize_repeated_message_field(field: &Field) -> proc_macro2::TokenStream {
+fn classicalize_repeated_field(field: &Field) -> proc_macro2::TokenStream {
     let ident = field.ident.as_ref().unwrap();
     let mut ident_str = ident.to_string();
     if ident_str.starts_with("r#") {
@@ -111,6 +111,75 @@ fn classicalize_repeated_message_field(field: &Field) -> proc_macro2::TokenStrea
     }
 }
 
+fn classicalize_copy_field(field: &Field) -> proc_macro2::TokenStream {
+    let ident = field.ident.as_ref().unwrap();
+    let mut ident_str = ident.to_string();
+    if ident_str.starts_with("r#") {
+        ident_str = ident_str[2..].to_owned();
+    }
+    let ty = &field.ty;
+    let set = Ident::new(&format!("set_{}", ident_str), Span::call_site());
+    let get = Ident::new(&format!("get_{}", ident_str), Span::call_site());
+    quote! {
+        pub fn #set(&mut self, value: #ty) {
+            self.#ident = value;
+        }
+
+        pub fn #get(&self) -> #ty {
+            self.#ident
+        }
+    }
+}
+
+fn classicalize_string_field(field: &Field) -> proc_macro2::TokenStream {
+    let ident = field.ident.as_ref().unwrap();
+    let mut ident_str = ident.to_string();
+    if ident_str.starts_with("r#") {
+        ident_str = ident_str[2..].to_owned();
+    }
+    let set = Ident::new(&format!("set_{}", ident_str), Span::call_site());
+    let get = Ident::new(&format!("get_{}", ident_str), Span::call_site());
+    let take = Ident::new(&format!("take_{}", ident_str), Span::call_site());
+    quote! {
+        pub fn #set(&mut self, value: impl Into<String>) {
+            self.#ident = value.into();
+        }
+
+        pub fn #get(&self) -> &str {
+            &self.#ident
+        }
+
+        pub fn #take(&mut self) -> String {
+            ::std::mem::replace(&mut self.#ident, String::new())
+        }
+    }
+}
+
+fn classicalize_bytes_field(field: &Field) -> proc_macro2::TokenStream {
+    let ident = field.ident.as_ref().unwrap();
+    let mut ident_str = ident.to_string();
+    if ident_str.starts_with("r#") {
+        ident_str = ident_str[2..].to_owned();
+    }
+    let set = Ident::new(&format!("set_{}", ident_str), Span::call_site());
+    let get = Ident::new(&format!("get_{}", ident_str), Span::call_site());
+    let take = Ident::new(&format!("take_{}", ident_str), Span::call_site());
+    quote! {
+        pub fn #set(&mut self, value: impl Into<Vec<u8>>) {
+            self.#ident = value.into();
+        }
+
+        pub fn #get(&self) -> &[u8] {
+            &self.#ident
+        }
+
+        pub fn #take(&mut self) -> Vec<u8> {
+            ::std::mem::replace(&mut self.#ident, Vec::new())
+        }
+    }
+}
+
+
 fn classicalize_enum_field(field: &Field, lit: &Lit) -> proc_macro2::TokenStream {
     let ident = field.ident.as_ref().unwrap();
     let get = Ident::new(&format!("get_{}", ident), Span::call_site());
@@ -128,23 +197,40 @@ fn classicalize_enum_field(field: &Field, lit: &Lit) -> proc_macro2::TokenStream
     }
 }
 
+#[derive(PartialEq)]
+enum FieldType {
+    Message,
+    Copyable,
+    String,
+    Bytes,
+}
+
+#[derive(PartialEq)]
+enum Frequency {
+    Optional,
+    Repeated,
+}
+
 fn classicalize_accessors(field: &Field) -> Option<proc_macro2::TokenStream> {
     for a in &field.attrs {
         for m in a.interpret_meta() {
             match m {
                 Meta::List(MetaList { ident, nested, .. }) => {
                     if ident == "prost" {
-                        let mut message = false;
-                        let mut optional = false;
-                        let mut repeated = false;
+                        let mut ft = FieldType::Copyable;
+                        let mut freq = Frequency::Optional;
                         for n in nested {
                             match n {
                                 NestedMeta::Meta(Meta::Word(w)) => if w == "message" {
-                                    message = true;
+                                    ft = FieldType::Message;
                                 } else if w == "optional" {
-                                    optional = true;
+                                    freq = Frequency::Optional;
                                 } else if w == "repeated" {
-                                    repeated = true;
+                                    freq = Frequency::Repeated;
+                                } else if w == "bytes" {
+                                    ft = FieldType::Bytes;
+                                } else if w == "string" {
+                                    ft = FieldType::String;
                                 }
                                 NestedMeta::Meta(Meta::NameValue(nv)) => if nv.ident == "enumeration" {
                                     return Some(classicalize_enum_field(field, &nv.lit))
@@ -152,13 +238,17 @@ fn classicalize_accessors(field: &Field) -> Option<proc_macro2::TokenStream> {
                                 _ => ()
                             }
                         }
-                        if message {
-                            if optional {
-                                return Some(classicalize_optional_message_field(field));
-                            } else if repeated {
-                                return Some(classicalize_repeated_message_field(field));
+                        return Some(match freq {
+                            Frequency::Repeated => classicalize_repeated_field(field),
+                            Frequency::Optional => {
+                                match ft {
+                                    FieldType::Message => classicalize_optional_message_field(field),
+                                    FieldType::Copyable => classicalize_copy_field(field),
+                                    FieldType::String => classicalize_string_field(field),
+                                    FieldType::Bytes => classicalize_bytes_field(field),
+                                }
                             }
-                        }
+                        })
                     }
                 },
                 _ => (),

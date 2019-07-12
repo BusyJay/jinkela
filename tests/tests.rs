@@ -15,6 +15,12 @@ mod prost_tests {
         b3: Vec<B>,
         #[prost(enumeration = "E")]
         e: i32,
+        #[prost(bool)]
+        pub notify_only: bool,
+        #[prost(string)]
+        pub cf: std::string::String,
+        #[prost(bytes)]
+        pub key: std::vec::Vec<u8>,
     }
 
     #[derive(::jinkela::Classicalize, Default, Debug, PartialEq)]
@@ -69,6 +75,14 @@ mod prost_tests {
         assert_eq!(a.get_b3(), &[]);
         a.set_b3(vec![B::default(), B::default()]);
         assert_eq!(a.get_b3().len(), 2);
+        a.set_cf("test".to_owned());
+        assert_eq!(a.get_cf(), "test");
+        assert_eq!(a.take_cf(), "test".to_owned());
+        a.set_key(b"test".to_vec());
+        assert_eq!(a.get_key(), b"test");
+        assert_eq!(a.take_key(), b"test".to_vec());
+        a.set_notify_only(true);
+        assert!(a.get_notify_only());
     }
 
     #[test]

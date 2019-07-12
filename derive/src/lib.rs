@@ -6,11 +6,11 @@ use quote::quote;
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use syn::{
-    Data, DataEnum, DataStruct, DeriveInput, Fields, FieldsNamed,
-    FieldsUnnamed, Ident, Variant, Meta, Field, MetaList, NestedMeta,
+    Data, DataEnum, DataStruct, DeriveInput, Fields, FieldsNamed, PathArguments, GenericArgument,
+    FieldsUnnamed, Ident, Variant, Meta, Field, MetaList, NestedMeta, Type,
 };
 
-#[proc_macro_derive(Classicalize, attributes(rust))]
+#[proc_macro_derive(Classicalize, attributes(prost))]
 pub fn classicalize(input: TokenStream) -> TokenStream {
     let input: DeriveInput = syn::parse(input).unwrap();
     let s = match input.data {
@@ -45,6 +45,20 @@ fn classicalize_accessors(field: &Field) -> Option<proc_macro2::TokenStream> {
         ident_str = ident_str[2..].to_owned();
     }
     let ty = &field.ty;
+    let ty = match ty {
+        Type::Path(tp) => {
+            let wrapper = &tp.path.segments.iter().next().unwrap().arguments;
+            let generic_arg = match wrapper {
+                PathArguments::AngleBracketed(params) => params.args.iter().next().unwrap(),
+                e => panic!("unexpected token {:?}", e),
+            };
+            match generic_arg {
+                GenericArgument::Type(ty) => ty,
+                e => panic!("expected generic, but get {:?}", e),
+            }
+        },
+        t => panic!("unexpected type {:?}", t),
+    };
     let set = Ident::new(&format!("set_{}", ident_str), Span::call_site());
     let get = Ident::new(&format!("get_{}", ident_str), Span::call_site());
     let mutation = Ident::new(&format!("mut_{}", ident_str), Span::call_site());
@@ -105,6 +119,16 @@ fn classicalize_struct(ident: Ident, s: DataStruct) -> proc_macro2::TokenStream 
         const #dummy_const: () = {
             extern crate prost as _prost;
             extern crate bytes as _bytes;
+            extern crate lazy_static;
+
+            impl #ident {
+                pub fn default_instance() -> &'static #ident {
+                    lazy_static::lazy_static! {
+                        static ref INSTANCE: #ident = #ident::default();
+                    }
+                    &*INSTANCE
+                }
+            }
 
             #methods
         };

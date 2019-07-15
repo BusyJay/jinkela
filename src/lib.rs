@@ -1,4 +1,4 @@
-#[cfg(feature = "repr-prost")]
+#[cfg(feature = "prost-codec")]
 #[macro_use]
 extern crate quick_error;
 
@@ -18,7 +18,7 @@ pub trait GenericEnum: Sized {
     fn values() -> &'static [Self];
 }
 
-#[cfg(feature = "repr-protobuf")]
+#[cfg(feature = "protobuf-codec")]
 mod codec {
     pub use protobuf::ProtobufError;
 
@@ -51,7 +51,7 @@ mod codec {
     }
 }
 
-#[cfg(feature = "repr-prost")]
+#[cfg(feature = "prost-codec")]
 mod codec {
     use prost::{EncodeError, DecodeError};
 
@@ -97,5 +97,5 @@ mod codec {
 }
 
 pub use codec::ProtobufError;
-#[cfg(feature = "repr-prost")]
+#[cfg(feature = "prost-codec")]
 pub use jinkela_derive::*;

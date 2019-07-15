@@ -16,8 +16,8 @@ members = ["derive", "build"]
 
 [features]
 default = []
-repr-protobuf = ["protobuf", "protobuf-codegen-pure"]
-repr-prost = ["prost", "prost-build", "bytes", "quick-error", "jinkela-derive"]
+protobuf-codec = ["protobuf", "protobuf-codegen-pure"]
+prost-codec = ["prost", "prost-build", "bytes", "quick-error", "jinkela-derive"]
 
 [build-dependencies]
 protobuf-codegen-pure = { version = "2.7", optional = true }

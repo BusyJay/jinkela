@@ -1,7 +1,7 @@
-#[cfg(feature = "repr-prost")]
+#[cfg(feature = "prost-codec")]
 extern crate prost;
 
-#[cfg(feature = "repr-prost")]
+#[cfg(feature = "prost-codec")]
 mod prost_tests {
     use jinkela::GenericEnum;
 

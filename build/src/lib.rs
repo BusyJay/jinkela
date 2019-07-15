@@ -48,7 +48,7 @@ impl Builder {
         }
     }
 
-    #[cfg(feature = "repr-protobuf")]
+    #[cfg(feature = "protobuf-codec")]
     fn internal_build(&self, out_dir: &str) {
         let mut includes: Vec<&str> = Vec::new();
         for i in &self.includes {
@@ -66,7 +66,7 @@ impl Builder {
         }).unwrap();
     }
 
-    #[cfg(feature = "repr-prost")]
+    #[cfg(feature = "prost-codec")]
     fn internal_build(&self, out_dir: &str) {
         prost_build::Config::new().type_attribute(".", "#[derive(::jinkela::Classicalize)]").out_dir(out_dir).compile_protos(&self.sources, &self.includes).unwrap();
     }

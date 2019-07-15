@@ -6,8 +6,8 @@ edition = "2018"
 
 [features]
 default = []
-repr-protobuf = ["protobuf-codegen-pure"]
-repr-prost = ["prost-build"]
+protobuf-codec = ["protobuf-codegen-pure"]
+prost-codec = ["prost-build"]
 
 [dependencies]
 protobuf-codegen-pure = { version = "2.7", optional = true }

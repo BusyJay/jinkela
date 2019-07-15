@@ -8,7 +8,10 @@ edition = "2018"
 default = []
 protobuf-codec = ["protobuf-codegen-pure"]
 prost-codec = ["prost-build"]
+grpcio-protobuf-codec = ["grpcio-compiler/protobuf-codec", "protobuf-codec"]
+grpcio-prost-codec = ["grpcio-compiler/prost-codec", "prost-codec"]
 
 [dependencies]
 protobuf-codegen-pure = { version = "2.7", optional = true }
 prost-build = { version = "0.5", optional = true }
+grpcio-compiler = { git = "https://github.com/busyjay/grpc-rs", branch = "make-peace-for-pb", optional = true, default-features = false }

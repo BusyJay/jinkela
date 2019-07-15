@@ -25,6 +25,9 @@ impl Builder {
     }
 
     pub fn build(&self) {
+        for (key, value) in std::env::vars() {
+            println!("{}: {}", key, value);
+        }
         let proto_dir = self.out_dir.clone().unwrap_or_else(|| {
             let out_dir = std::env::var("OUT_DIR").unwrap();
             format!("{}/protos", out_dir)
@@ -50,6 +53,7 @@ impl Builder {
 
     #[cfg(feature = "protobuf-codec")]
     fn internal_build(&self, out_dir: &str) {
+        println!("building protobuf at {}", out_dir);
         let mut includes: Vec<&str> = Vec::new();
         for i in &self.includes {
             includes.push(&i);
@@ -64,10 +68,43 @@ impl Builder {
             input: &inputs,
             customize: protobuf_codegen_pure::Customize::default(),
         }).unwrap();
+        self.build_grpcio(&includes, &inputs, &out_dir);
     }
 
     #[cfg(feature = "prost-codec")]
     fn internal_build(&self, out_dir: &str) {
-        prost_build::Config::new().type_attribute(".", "#[derive(::jinkela::Classicalize)]").out_dir(out_dir).compile_protos(&self.sources, &self.includes).unwrap();
+        println!("building prost at {}", out_dir);
+        let mut cfg = prost_build::Config::new();
+        cfg.type_attribute(".", "#[derive(::jinkela::Classicalize)]").out_dir(out_dir);
+        self.config_grpcio(&mut cfg);
+        cfg.compile_protos(&self.sources, &self.includes).unwrap();
     }
+
+    #[cfg(feature = "grpcio-protobuf-codec")]
+    fn build_grpcio(&self, includes: &[&str], inputs: &[&str], output: &str) {
+        println!("building protobuf with grpcio at {}", output);
+        let output_dir = std::path::Path::new(output);
+        let protos = protobuf_codegen_pure::parse_and_typecheck(&includes, &inputs).unwrap();
+        println!("{:?}", protos.file_descriptors);
+        println!("{:?}", protos.relative_paths);
+        let results = grpcio_compiler::codegen::gen(&protos.file_descriptors, &protos.relative_paths);
+        for res in results {
+            println!("writing {}", res.name);
+            let out_file = output_dir.join(&res.name);
+            let mut f = File::create(&out_file).unwrap();
+            f.write_all(&res.content).unwrap();
+        }
+    }
+
+    #[cfg(all(feature = "protobuf-codec", not(feature = "grpcio-protobuf-codec")))]
+    fn build_grpcio(&self, _includes: &[&str], _inputs: &[&str], _output: &str) {}
+
+    #[cfg(feature = "grpcio-prost-codec")]
+    fn config_grpcio(&self, cfg: &mut prost_build::Config) {
+        println!("building prost with grpcio");
+        cfg.service_generator(Box::new(grpcio_compiler::prost_codegen::Generator));
+    }
+
+    #[cfg(all(feature = "prost-codec", not(feature = "grpcio-prost-codec")))]
+    fn config_grpcio(&self, _cfg: &mut prost_build::Config) {}
 }

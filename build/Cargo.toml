@@ -6,14 +6,16 @@ edition = "2018"
 
 [features]
 default = []
-protobuf-codec = ["protobuf-codegen", "protoc", "protobuf"]
-prost-codec = ["prost-build"]
+protobuf-codec = ["protobuf-codegen", "protobuf"]
+prost-codec = ["prost-build", "prost-types"]
 grpcio-protobuf-codec = ["grpcio-compiler/protobuf-codec", "protobuf-codec"]
-grpcio-prost-codec = ["grpcio-compiler/prost-codec", "prost-codec"]
+grpcio-prost-codec = ["grpcio-compiler/prost-codec", "prost-codec", "prost"]
 
 [dependencies]
 protobuf-codegen = { version = "2.7", optional = true }
-protoc = { git = "https://github.com/pingcap/rust-protobuf", branch = "bundle-protoc", optional = true }
+protoc = { git = "https://github.com/pingcap/rust-protobuf", branch = "bundle-protoc" }
 protobuf = { version = "2.7", optional = true }
+prost = { version = "0.5", optional = true }
 prost-build = { version = "0.5", optional = true }
+prost-types = { version = "0.5", optional = true }
 grpcio-compiler = { git = "https://github.com/busyjay/grpc-rs", branch = "make-peace-for-pb", optional = true, default-features = false }

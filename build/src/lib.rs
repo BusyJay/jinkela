@@ -36,30 +36,9 @@ impl Builder {
             std::fs::remove_dir_all(&proto_dir).unwrap();
         }
         std::fs::create_dir_all(&proto_dir).unwrap();
-        self.internal_build(&proto_dir);
-        let modules: Vec<_> = std::fs::read_dir(&proto_dir).unwrap().filter_map(|res| {
-            let path = match res {
-                Ok(e) => e.path(),
-                Err(e) => panic!("failed to list {}: {:?}", proto_dir, e),
-            };
-            if path.extension() == Some(std::ffi::OsStr::new("rs")) {
-                let name = path.file_stem().unwrap().to_str().unwrap();
-                Some(name.replace('-', "_"))
-            } else {
-                None
-            }
-        }).collect();
-        let mut f = File::create(format!("{}/mod.rs", proto_dir)).unwrap();
-        for module in &modules {
-            writeln!(f, "pub mod {};", module).unwrap();
-        }
-    }
 
-    #[cfg(feature = "protobuf-codec")]
-    fn internal_build(&self, out_dir: &str) {
-        println!("building protobuf at {}", out_dir);
         let protoc = protoc::Protoc::from_env_path();
-        let desc_file = format!("{}/mod.desc", out_dir);
+        let desc_file = format!("{}/mod.desc", proto_dir);
         let mut includes: Vec<&str> = Vec::new();
         for i in &self.includes {
             includes.push(&i);
@@ -74,19 +53,55 @@ impl Builder {
             input: &inputs,
             include_imports: true,
         }).unwrap();
+
+        self.internal_build(&proto_dir, &desc_file);
+        let modules: Vec<_> = std::fs::read_dir(&proto_dir).unwrap().filter_map(|res| {
+            let path = match res {
+                Ok(e) => e.path(),
+                Err(e) => panic!("failed to list {}: {:?}", proto_dir, e),
+            };
+            if path.extension() == Some(std::ffi::OsStr::new("rs")) {
+                let name = path.file_stem().unwrap().to_str().unwrap();
+                Some((name.replace('-', "_"), name.to_owned()))
+            } else {
+                None
+            }
+        }).collect();
+        let mut f = File::create(format!("{}/mod.rs", proto_dir)).unwrap();
+        for (module, file_name) in &modules {
+            if !module.contains('.') {
+                writeln!(f, "pub mod {};", module).unwrap();
+                continue;
+            }
+            let mut level = 0;
+            for part in module.split('.') {
+                writeln!(f, "{:level$}pub mod {} {{", "", part, level = level).unwrap();
+                level += 1;
+            }
+            writeln!(f, "include!(\"{}.rs\");", file_name).unwrap();
+            for _ in (0..level).rev() {
+                writeln!(f, "{:1$}}}", "", level).unwrap();
+            }
+        }
+    }
+
+    #[cfg(feature = "protobuf-codec")]
+    fn internal_build(&self, out_dir: &str, desc_file: &str) {
+        println!("building protobuf at {} for {}", out_dir, desc_file);
+        
         let desc_bytes = std::fs::read(&desc_file).unwrap();
         let desc: protobuf::descriptor::FileDescriptorSet = protobuf::parse_from_bytes(&desc_bytes).unwrap();
         let mut files_to_generate = Vec::new();
-        'outer: for file in &inputs {
+        'outer: for file in &self.sources {
             let f = std::path::Path::new(file);
-            for include in &includes {
+            for include in &self.includes {
                 if let Some(truncated) = f.strip_prefix(include).ok() {
                     files_to_generate.push(format!("{}", truncated.display()));
                     continue 'outer;
                 }
             }
 
-            panic!("file {:?} is not found in includes {:?}", file, includes);
+            panic!("file {:?} is not found in includes {:?}", file, self.includes);
         }
 
         protobuf_codegen::gen_and_write(
@@ -99,12 +114,13 @@ impl Builder {
     }
 
     #[cfg(feature = "prost-codec")]
-    fn internal_build(&self, out_dir: &str) {
+    fn internal_build(&self, out_dir: &str, desc_file: &str) {
         println!("building prost at {}", out_dir);
         let mut cfg = prost_build::Config::new();
         cfg.type_attribute(".", "#[derive(::jinkela::Classicalize)]").out_dir(out_dir);
-        self.config_grpcio(&mut cfg);
         cfg.compile_protos(&self.sources, &self.includes).unwrap();
+
+        self.build_grpcio(out_dir, desc_file);
     }
 
     #[cfg(feature = "grpcio-protobuf-codec")]
@@ -123,11 +139,32 @@ impl Builder {
     fn build_grpcio(&self, _: &[protobuf::descriptor::FileDescriptorProto], _: &[String], _: &str) {}
 
     #[cfg(feature = "grpcio-prost-codec")]
-    fn config_grpcio(&self, cfg: &mut prost_build::Config) {
-        println!("building prost with grpcio");
-        cfg.service_generator(Box::new(grpcio_compiler::prost_codegen::Generator));
+    fn build_grpcio(&self, out_dir: &str, desc_file: &str) {
+        use prost::Message;
+        
+        let desc_bytes = std::fs::read(&desc_file).unwrap();
+        let desc = prost_types::FileDescriptorSet::decode(&desc_bytes).unwrap();
+        let mut files_to_generate = Vec::new();
+        'outer: for file in &self.sources {
+            let f = std::path::Path::new(file);
+            for include in &self.includes {
+                if let Some(truncated) = f.strip_prefix(include).ok() {
+                    files_to_generate.push(format!("{}", truncated.display()));
+                    continue 'outer;
+                }
+            }
+
+            panic!("file {:?} is not found in includes {:?}", file, self.includes);
+        }
+        let out_dir = std::path::Path::new(out_dir);
+        let results = grpcio_compiler::codegen::gen(&desc.file, &files_to_generate);
+        for res in results {
+            let out_file = out_dir.join(&res.name);
+            let mut f = File::create(&out_file).unwrap();
+            f.write_all(&res.content).unwrap();
+        }
     }
 
     #[cfg(all(feature = "prost-codec", not(feature = "grpcio-prost-codec")))]
-    fn config_grpcio(&self, _cfg: &mut prost_build::Config) {}
+    fn build_grpcio(&self, _out_dir: &str, _desc_file: &str) {}
 }

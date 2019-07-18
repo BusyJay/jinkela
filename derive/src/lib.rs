@@ -187,7 +187,11 @@ fn classicalize_bytes_field(field: &Field) -> proc_macro2::TokenStream {
 
 fn classicalize_enum_field(field: &Field, lit: &Lit) -> proc_macro2::TokenStream {
     let ident = field.ident.as_ref().unwrap();
-    let get = Ident::new(&format!("get_{}", ident), Span::call_site());
+    let mut ident_str = ident.to_string();
+    if ident_str.starts_with("r#") {
+        ident_str = ident_str[2..].to_owned();
+    }
+    let get = Ident::new(&format!("get_{}", ident_str), Span::call_site());
     let ty = match lit {
         Lit::Str(s) => syn::parse_str::<Path>(&s.value()).unwrap(),
         _ => panic!("expected enum type, but got {:?}", lit),

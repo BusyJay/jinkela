@@ -14,7 +14,7 @@ mod prost_tests {
         #[prost(message, repeated)]
         b3: Vec<B>,
         #[prost(enumeration = "E")]
-        e: i32,
+        r#type: i32,
         #[prost(bool)]
         pub notify_only: bool,
         #[prost(string)]
@@ -70,9 +70,9 @@ mod prost_tests {
         assert_eq!(*B::default_instance(), b);
         a.set_b2(b);
         assert_eq!(a.get_b2().b, 0);
-        assert_eq!(a.get_e(), E::T);
-        a.e = E::C as i32;
-        assert_eq!(a.get_e(), E::C);
+        assert_eq!(a.get_type(), E::T);
+        a.r#type = E::C as i32;
+        assert_eq!(a.get_type(), E::C);
         assert_eq!(a.get_b3(), &[]);
         a.mut_b3().push(B::default());
         assert_eq!(a.take_b3(), vec![B::default()]);
